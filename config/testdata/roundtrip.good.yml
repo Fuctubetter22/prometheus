@@ -15,7 +15,8 @@ alerting:
             - 1.2.3.4:9093
             - 1.2.3.5:9093
             - 1.2.3.6:9093
-
+global:
+  metric_name_validation_scheme: legacy
 scrape_configs:
   - job_name: foo
     static_configs:
