@@ -2317,3 +2317,42 @@ func TestScrapeConfigDisableCompression(t *testing.T) {
 
 	require.False(t, got.ScrapeConfigs[0].EnableCompression)
 }
+
+func TestScrapeConfigLegacyGlobalImpliesLegacyValidation(t *testing.T) {
+	want, err := LoadFile("testdata/scrape_config_global_validation_mode.yml", false, false, log.NewNopLogger())
+	require.NoError(t, err)
+
+	out, err := yaml.Marshal(want)
+
+	require.NoError(t, err)
+	got := &Config{}
+	require.NoError(t, yaml.UnmarshalStrict(out, got))
+
+	require.Equal(t, "legacy", got.ScrapeConfigs[0].MetricNameValidationScheme)
+}
+
+func TestScrapeConfigLegacyLocalLegacyValidation(t *testing.T) {
+	want, err := LoadFile("testdata/scrape_config_local_validation_mode.yml", false, false, log.NewNopLogger())
+	require.NoError(t, err)
+
+	out, err := yaml.Marshal(want)
+
+	require.NoError(t, err)
+	got := &Config{}
+	require.NoError(t, yaml.UnmarshalStrict(out, got))
+
+	require.Equal(t, "legacy", got.ScrapeConfigs[0].MetricNameValidationScheme)
+}
+
+func TestScrapeConfigLegacyLocalOverridesGlobalValidation(t *testing.T) {
+	want, err := LoadFile("testdata/scrape_config_local_global_validation_mode.yml", false, false, log.NewNopLogger())
+	require.NoError(t, err)
+
+	out, err := yaml.Marshal(want)
+
+	require.NoError(t, err)
+	got := &Config{}
+	require.NoError(t, yaml.UnmarshalStrict(out, got))
+
+	require.Equal(t, "utf8", got.ScrapeConfigs[0].MetricNameValidationScheme)
+}
