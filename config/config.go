@@ -784,7 +784,6 @@ func (c *ScrapeConfig) Validate(globalConfig GlobalConfig) error {
 	if c.MetricNameValidationScheme == "" {
 		c.MetricNameValidationScheme = globalConfig.MetricNameValidationScheme
 	}
-	fmt.Println("glob", globalConfig.MetricNameValidationScheme, "local", c.MetricNameValidationScheme)
 
 	return nil
 }
