@@ -49,22 +49,25 @@ func TestRecord_EncodeDecode(t *testing.T) {
 
 	metadata := []RefMetadata{
 		{
-			Ref:  100,
-			Type: uint8(Counter),
-			Unit: "",
-			Help: "some magic counter",
+			Ref:              100,
+			Type:             uint8(Counter),
+			Unit:             "",
+			Help:             "some magic counter",
+			CreatedTimestamp: 1234,
 		},
 		{
-			Ref:  1,
-			Type: uint8(Counter),
-			Unit: "seconds",
-			Help: "CPU time counter",
+			Ref:              1,
+			Type:             uint8(Counter),
+			Unit:             "seconds",
+			Help:             "CPU time counter",
+			CreatedTimestamp: 1000,
 		},
 		{
-			Ref:  147741,
-			Type: uint8(Gauge),
-			Unit: "percentage",
-			Help: "current memory usage",
+			Ref:              147741,
+			Type:             uint8(Gauge),
+			Unit:             "percentage",
+			Help:             "current memory usage",
+			CreatedTimestamp: 1020,
 		},
 	}
 	decMetadata, err := dec.Metadata(enc.Metadata(metadata, nil), nil)
