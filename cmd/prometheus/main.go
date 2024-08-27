@@ -98,7 +98,7 @@ var (
 	defaultRetentionString   = "15d"
 	defaultRetentionDuration model.Duration
 
-	agentMode                       bool
+	runtimeMode                     config.RuntimeMode
 	agentOnlyFlags, serverOnlyFlags []string
 )
 
@@ -201,9 +201,6 @@ func (c *flagConfig) setFeatureListOptions(logger log.Logger) error {
 			case "new-service-discovery-manager":
 				c.enableNewSDManager = true
 				level.Info(logger).Log("msg", "Experimental service discovery manager")
-			case "agent":
-				agentMode = true
-				level.Info(logger).Log("msg", "Experimental agent mode enabled.")
 			case "promql-per-step-stats":
 				c.enablePerStepStats = true
 				level.Info(logger).Log("msg", "Experimental per-step statistics reporting")
@@ -487,10 +484,12 @@ func main() {
 
 	a.Flag("scrape.name-escaping-scheme", `Method for escaping legacy invalid names when sending to Prometheus that does not support UTF-8. Can be one of "values", "underscores", or "dots".`).Default(scrape.DefaultNameEscapingScheme.String()).StringVar(&cfg.nameEscapingScheme)
 
-	a.Flag("enable-feature", "Comma separated feature names to enable. Valid options: agent, auto-gomemlimit, exemplar-storage, expand-external-labels, memory-snapshot-on-shutdown, promql-per-step-stats, promql-experimental-functions, remote-write-receiver (DEPRECATED), extra-scrape-metrics, new-service-discovery-manager, auto-gomaxprocs, no-default-scrape-port, native-histograms, otlp-write-receiver, created-timestamp-zero-ingestion, concurrent-rule-eval, delayed-compaction, utf8-names. See https://prometheus.io/docs/prometheus/latest/feature_flags/ for more details.").
+	a.Flag("enable-feature", "Comma separated feature names to enable. Valid options: auto-gomemlimit, exemplar-storage, expand-external-labels, memory-snapshot-on-shutdown, promql-per-step-stats, promql-experimental-functions, remote-write-receiver (DEPRECATED), extra-scrape-metrics, new-service-discovery-manager, auto-gomaxprocs, no-default-scrape-port, native-histograms, otlp-write-receiver, created-timestamp-zero-ingestion, concurrent-rule-eval, delayed-compaction, utf8-names. See https://prometheus.io/docs/prometheus/latest/feature_flags/ for more details.").
 		Default("").StringsVar(&cfg.featureList)
 
 	promlogflag.AddFlags(a, &cfg.promlogConfig)
+
+	a.Flag("runtime.mode", "Runtime mode of Prometheus. Can be one of 'server' or 'agent'.").Default("server").EnumVar((*string)(&runtimeMode), "server", "agent")
 
 	a.Flag("write-documentation", "Generate command line documentation. Internal use.").Hidden().Action(func(ctx *kingpin.ParseContext) error {
 		if err := documentcli.GenerateMarkdown(a.Model(), os.Stdout); err != nil {
@@ -524,12 +523,12 @@ func main() {
 		model.NameEscapingScheme = scheme
 	}
 
-	if agentMode && len(serverOnlyFlags) > 0 {
+	if runtimeMode != config.ServerMode && len(serverOnlyFlags) > 0 {
 		fmt.Fprintf(os.Stderr, "The following flag(s) can not be used in agent mode: %q", serverOnlyFlags)
 		os.Exit(3)
 	}
 
-	if !agentMode && len(agentOnlyFlags) > 0 {
+	if runtimeMode != config.AgentMode && len(agentOnlyFlags) > 0 {
 		fmt.Fprintf(os.Stderr, "The following flag(s) can only be used in agent mode: %q", agentOnlyFlags)
 		os.Exit(3)
 	}
@@ -540,7 +539,7 @@ func main() {
 	}
 
 	localStoragePath := cfg.serverStoragePath
-	if agentMode {
+	if runtimeMode == config.AgentMode {
 		localStoragePath = cfg.agentStoragePath
 	}
 
@@ -562,7 +561,7 @@ func main() {
 
 	// Throw error for invalid config before starting other components.
 	var cfgFile *config.Config
-	if cfgFile, err = config.LoadFile(cfg.configFile, agentMode, false, log.NewNopLogger()); err != nil {
+	if cfgFile, err = config.LoadFile(cfg.configFile, runtimeMode, false, log.NewNopLogger()); err != nil {
 		absPath, pathErr := filepath.Abs(cfg.configFile)
 		if pathErr != nil {
 			absPath = cfg.configFile
@@ -605,7 +604,7 @@ func main() {
 	// RoutePrefix must always be at least '/'.
 	cfg.web.RoutePrefix = "/" + strings.Trim(cfg.web.RoutePrefix, "/")
 
-	if !agentMode {
+	if runtimeMode != config.AgentMode {
 		// Time retention settings.
 		if oldFlagRetentionDuration != 0 {
 			level.Warn(logger).Log("deprecation_notice", "'storage.tsdb.retention' flag is deprecated use 'storage.tsdb.retention.time' instead.")
@@ -658,7 +657,7 @@ func main() {
 
 	modeAppName := "Prometheus Server"
 	mode := "server"
-	if agentMode {
+	if runtimeMode == config.AgentMode {
 		modeAppName = "Prometheus Agent"
 		mode = "agent"
 	}
@@ -788,7 +787,7 @@ func main() {
 		}
 	}
 
-	if !agentMode {
+	if runtimeMode != config.AgentMode {
 		opts := promql.EngineOpts{
 			Logger:                   log.With(logger, "component", "query engine"),
 			Reg:                      prometheus.DefaultRegisterer,
@@ -840,7 +839,7 @@ func main() {
 	cfg.web.RuleManager = ruleManager
 	cfg.web.Notifier = notifierManager
 	cfg.web.LookbackDelta = time.Duration(cfg.lookbackDelta)
-	cfg.web.IsAgent = agentMode
+	cfg.web.IsAgent = runtimeMode == config.AgentMode
 	cfg.web.AppName = modeAppName
 
 	cfg.web.Version = &web.PrometheusVersion{
@@ -888,7 +887,7 @@ func main() {
 		}, {
 			name: "query_engine",
 			reloader: func(cfg *config.Config) error {
-				if agentMode {
+				if runtimeMode == config.AgentMode {
 					// No-op in Agent mode.
 					return nil
 				}
@@ -938,7 +937,7 @@ func main() {
 		}, {
 			name: "rules",
 			reloader: func(cfg *config.Config) error {
-				if agentMode {
+				if runtimeMode == config.AgentMode {
 					// No-op in Agent mode
 					return nil
 				}
@@ -1056,7 +1055,7 @@ func main() {
 			},
 		)
 	}
-	if !agentMode {
+	if runtimeMode != config.AgentMode {
 		// Rule manager.
 		g.Add(
 			func() error {
@@ -1172,7 +1171,7 @@ func main() {
 			},
 		)
 	}
-	if !agentMode {
+	if runtimeMode != config.AgentMode {
 		// TSDB.
 		opts := cfg.tsdb.ToTSDBOptions()
 		cancel := make(chan struct{})
@@ -1228,7 +1227,7 @@ func main() {
 			},
 		)
 	}
-	if agentMode {
+	if runtimeMode == config.AgentMode {
 		// WAL storage.
 		opts := cfg.agent.ToAgentOptions(cfg.tsdb.OutOfOrderTimeWindow)
 		cancel := make(chan struct{})
@@ -1396,7 +1395,7 @@ func reloadConfig(filename string, expandExternalLabels, enableExemplarStorage b
 		}
 	}()
 
-	conf, err := config.LoadFile(filename, agentMode, expandExternalLabels, logger)
+	conf, err := config.LoadFile(filename, runtimeMode, expandExternalLabels, logger)
 	if err != nil {
 		return fmt.Errorf("couldn't load configuration (--config.file=%q): %w", filename, err)
 	}

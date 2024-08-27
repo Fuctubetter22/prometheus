@@ -33,6 +33,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/rulefmt"
 )
@@ -219,7 +220,7 @@ func TestCheckTargetConfig(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := checkConfig(false, "testdata/"+test.file, false)
+			_, err := checkConfig(config.ServerMode, "testdata/"+test.file, false)
 			if test.err != "" {
 				require.Equalf(t, test.err, err.Error(), "Expected error %q, got %q", test.err, err.Error())
 				return
@@ -302,7 +303,7 @@ func TestCheckConfigSyntax(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := checkConfig(false, "testdata/"+test.file, test.syntaxOnly)
+			_, err := checkConfig(config.ServerMode, "testdata/"+test.file, test.syntaxOnly)
 			expectedErrMsg := test.err
 			if strings.Contains(runtime.GOOS, "windows") {
 				expectedErrMsg = test.errWindows
@@ -336,7 +337,7 @@ func TestAuthorizationConfig(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := checkConfig(false, "testdata/"+test.file, false)
+			_, err := checkConfig(config.ServerMode, "testdata/"+test.file, false)
 			if test.err != "" {
 				require.Contains(t, err.Error(), test.err, "Expected error to contain %q, got %q", test.err, err.Error())
 				return

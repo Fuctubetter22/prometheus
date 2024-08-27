@@ -72,6 +72,13 @@ const (
 	UTF8ValidationConfig   = "utf8"
 )
 
+type RuntimeMode string
+
+const (
+	ServerMode RuntimeMode = "server"
+	AgentMode  RuntimeMode = "agent"
+)
+
 // Load parses the YAML input s into a Config.
 func Load(s string, expandExternalLabels bool, logger log.Logger) (*Config, error) {
 	cfg := &Config{}
@@ -112,7 +119,7 @@ func Load(s string, expandExternalLabels bool, logger log.Logger) (*Config, erro
 }
 
 // LoadFile parses the given YAML file into a Config.
-func LoadFile(filename string, agentMode, expandExternalLabels bool, logger log.Logger) (*Config, error) {
+func LoadFile(filename string, runtimeMode RuntimeMode, expandExternalLabels bool, logger log.Logger) (*Config, error) {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -122,7 +129,7 @@ func LoadFile(filename string, agentMode, expandExternalLabels bool, logger log.
 		return nil, fmt.Errorf("parsing YAML file %s: %w", filename, err)
 	}
 
-	if agentMode {
+	if runtimeMode == AgentMode {
 		if len(cfg.AlertingConfig.AlertmanagerConfigs) > 0 || len(cfg.AlertingConfig.AlertRelabelConfigs) > 0 {
 			return nil, errors.New("field alerting is not allowed in agent mode")
 		}

@@ -75,7 +75,11 @@ const (
 	checkReadiness           = "/-/ready"
 )
 
-var lintOptions = []string{lintOptionAll, lintOptionDuplicateRules, lintOptionNone}
+var (
+	lintOptions = []string{lintOptionAll, lintOptionDuplicateRules, lintOptionNone}
+
+	runtimeMode config.RuntimeMode
+)
 
 func main() {
 	var (
@@ -143,7 +147,7 @@ func main() {
 
 	checkMetricsCmd := checkCmd.Command("metrics", checkMetricsUsage)
 	checkMetricsExtended := checkCmd.Flag("extended", "Print extended information related to the cardinality of the metrics.").Bool()
-	agentMode := checkConfigCmd.Flag("agent", "Check config file for Prometheus in Agent mode.").Bool()
+	checkConfigCmd.Flag("runtime.mode", "Which runtime mode considered when running checks.").Default("server").EnumVar((*string)(&runtimeMode), "server", "agent")
 
 	queryCmd := app.Command("query", "Run query against a Prometheus server.")
 	queryCmdFmt := queryCmd.Flag("format", "Output format of the query.").Short('o').Default("promql").Enum("promql", "json")
@@ -337,7 +341,7 @@ func main() {
 		os.Exit(CheckSD(*sdConfigFile, *sdJobName, *sdTimeout, noDefaultScrapePort, prometheus.DefaultRegisterer))
 
 	case checkConfigCmd.FullCommand():
-		os.Exit(CheckConfig(*agentMode, *checkConfigSyntaxOnly, newLintConfig(*checkConfigLint, *checkConfigLintFatal), *configFiles...))
+		os.Exit(CheckConfig(runtimeMode, *checkConfigSyntaxOnly, newLintConfig(*checkConfigLint, *checkConfigLintFatal), *configFiles...))
 
 	case checkServerHealthCmd.FullCommand():
 		os.Exit(checkErr(CheckServerStatus(serverURL, checkHealth, httpRoundTripper)))
@@ -509,12 +513,12 @@ func CheckServerStatus(serverURL *url.URL, checkEndpoint string, roundTripper ht
 }
 
 // CheckConfig validates configuration files.
-func CheckConfig(agentMode, checkSyntaxOnly bool, lintSettings lintConfig, files ...string) int {
+func CheckConfig(runtimeMode config.RuntimeMode, checkSyntaxOnly bool, lintSettings lintConfig, files ...string) int {
 	failed := false
 	hasErrors := false
 
 	for _, f := range files {
-		ruleFiles, err := checkConfig(agentMode, f, checkSyntaxOnly)
+		ruleFiles, err := checkConfig(runtimeMode, f, checkSyntaxOnly)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "  FAILED:", err)
 			hasErrors = true
@@ -571,10 +575,10 @@ func checkFileExists(fn string) error {
 	return err
 }
 
-func checkConfig(agentMode bool, filename string, checkSyntaxOnly bool) ([]string, error) {
+func checkConfig(runtimeMode config.RuntimeMode, filename string, checkSyntaxOnly bool) ([]string, error) {
 	fmt.Println("Checking", filename)
 
-	cfg, err := config.LoadFile(filename, agentMode, false, log.NewNopLogger())
+	cfg, err := config.LoadFile(filename, runtimeMode, false, log.NewNopLogger())
 	if err != nil {
 		return nil, err
 	}

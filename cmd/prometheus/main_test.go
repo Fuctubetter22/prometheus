@@ -366,7 +366,7 @@ func TestAgentSuccessfulStartup(t *testing.T) {
 }
 
 func TestAgentFailedStartupWithServerFlag(t *testing.T) {
-	prom := exec.Command(promPath, "-test.main", "--enable-feature=agent", "--storage.tsdb.path=.", "--web.listen-address=0.0.0.0:0", "--config.file="+promConfig)
+	prom := exec.Command(promPath, "-test.main", "--runtime.mode=agent", "--storage.tsdb.path=.", "--web.listen-address=0.0.0.0:0", "--config.file="+promConfig)
 
 	output := bytes.Buffer{}
 	prom.Stderr = &output
@@ -393,7 +393,7 @@ func TestAgentFailedStartupWithServerFlag(t *testing.T) {
 }
 
 func TestAgentFailedStartupWithInvalidConfig(t *testing.T) {
-	prom := exec.Command(promPath, "-test.main", "--enable-feature=agent", "--web.listen-address=0.0.0.0:0", "--config.file="+promConfig)
+	prom := exec.Command(promPath, "-test.main", "--runtime.mode=agent", "--web.listen-address=0.0.0.0:0", "--config.file="+promConfig)
 	require.NoError(t, prom.Start())
 
 	actualExitStatus := 0
@@ -431,7 +431,7 @@ func TestModeSpecificFlags(t *testing.T) {
 			args := []string{"-test.main", tc.arg, t.TempDir(), "--web.listen-address=0.0.0.0:0"}
 
 			if tc.mode == "agent" {
-				args = append(args, "--enable-feature=agent", "--config.file="+agentConfig)
+				args = append(args, "--runtime.mode=agent", "--config.file="+agentConfig)
 			} else {
 				args = append(args, "--config.file="+promConfig)
 			}
